@@ -2,17 +2,17 @@ package main
 
 import (
 	"context"
-	"github.com/cenkalti/backoff/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/yuridevx/poe2scrap/pkg/proxysource"
-	"github.com/yuridevx/poe2scrap/pkg/proxysource/providers"
-	"github.com/yuridevx/poe2scrap/pkg/reconciler"
+	"github.com/yuridevx/proxylist/domain"
+	"github.com/yuridevx/proxylist/pkg/config"
+	"github.com/yuridevx/proxylist/pkg/providers"
+	"github.com/yuridevx/proxylist/pkg/proxytest"
+	"github.com/yuridevx/proxylist/pkg/reconciler"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 func initializeLogger(conf *config.Config) (*zap.Logger, error) {
@@ -55,42 +55,30 @@ func main() {
 		panic(err)
 	}
 
-	proxyDb := providers.NewProxyDB(logger, db)
-	urlLists := providers.NewKnowUrlLists(logger, db)
-	hostLists := providers.NewKnownHostPortList(logger, db)
+	var sink = make(chan domain.ProvidedProxy)
+	var proxyProviders []domain.ProxyProvider
 
-	for _, urlList := range urlLists {
-		reconciler.RunReconciler(
-			ctx,
-			urlList.Reconcile,
-			reconciler.WithFailBackOff(&backoff.ConstantBackOff{Interval: time.Hour}),
-			reconciler.WithWaitBackOff(&backoff.ConstantBackOff{Interval: time.Hour}),
-		)
+	for _, urlSource := range conf.UrlSourceList {
+		proxyProviders = append(proxyProviders, providers.NewUrlProxyList(urlSource))
+	}
+	for _, hostPortSource := range conf.HostPortSourceList {
+		proxyProviders = append(proxyProviders, providers.NewHostPortList(hostPortSource))
 	}
 
-	for _, hostList := range hostLists {
-		reconciler.RunReconciler(
-			ctx,
-			hostList.Reconcile,
-			reconciler.WithFailBackOff(&backoff.ConstantBackOff{Interval: time.Hour}),
-			reconciler.WithWaitBackOff(&backoff.ConstantBackOff{Interval: time.Hour}),
-		)
+	for _, prov := range proxyProviders {
+		prov.Init(logger, sink)
+		reconciler.RunReconciler(ctx, prov.Reconcile)
 	}
 
-	reconciler.RunReconciler(
-		ctx,
-		proxyDb.Reconcile,
-		reconciler.WithFailBackOff(&backoff.ConstantBackOff{Interval: time.Hour}),
-		reconciler.WithWaitBackOff(&backoff.ConstantBackOff{Interval: time.Hour}),
+	proxySink := proxytest.NewProxySink(
+		sink,
+		logger,
+		db,
+		conf.FetchItemUrl,
+		conf.ParallelTests,
+		conf.ProxyTimeoutS,
 	)
-
-	proxyCandidateReconciler := proxysource.NewProxyReconciler(logger, db, proxysource.NewProxyTest(logger, db))
-	reconciler.RunReconciler(
-		ctx,
-		proxyCandidateReconciler.Reconcile,
-		reconciler.WithFailBackOff(&backoff.ConstantBackOff{Interval: time.Second}),
-		reconciler.WithWaitBackOff(&backoff.ConstantBackOff{Interval: time.Minute}),
-	)
+	proxySink.Start(ctx)
 
 	<-ctx.Done()
 }

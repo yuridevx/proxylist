@@ -11,35 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countProxyCandidateForTest = `-- name: CountProxyCandidateForTest :one
-select count(*)
-from proxy_candidate
-where tested_at is null
-`
-
-func (q *Queries) CountProxyCandidateForTest(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countProxyCandidateForTest)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const insertProxyInfoTestResults = `-- name: InsertProxyInfoTestResults :exec
-insert into proxy_info (ip, port, protocol, delay, tested_at, websocket, anonymity, item_fetch)
-values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict (ip, port, protocol) do
-update
-    set delay = EXCLUDED.delay,
-    tested_at = EXCLUDED.tested_at,
-    websocket = EXCLUDED.websocket,
-    anonymity = EXCLUDED.anonymity,
-    item_fetch = EXCLUDED.item_fetch
+insert into proxy_info (ip, port, protocol, provider, delay_ms, tested_at, websocket, anonymity, item_fetch)
+values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+on conflict (ip, port, protocol) do update
+    set delay_ms   = EXCLUDED.delay_ms,
+        tested_at  = EXCLUDED.tested_at,
+        websocket  = EXCLUDED.websocket,
+        anonymity  = EXCLUDED.anonymity,
+        item_fetch = EXCLUDED.item_fetch
 `
 
 type InsertProxyInfoTestResultsParams struct {
 	Ip        string
 	Port      int32
 	Protocol  string
-	Delay     pgtype.Interval
+	Provider  pgtype.Text
+	DelayMs   pgtype.Int4
 	TestedAt  pgtype.Timestamp
 	Websocket pgtype.Bool
 	Anonymity pgtype.Bool
@@ -51,111 +39,12 @@ func (q *Queries) InsertProxyInfoTestResults(ctx context.Context, arg InsertProx
 		arg.Ip,
 		arg.Port,
 		arg.Protocol,
-		arg.Delay,
+		arg.Provider,
+		arg.DelayMs,
 		arg.TestedAt,
 		arg.Websocket,
 		arg.Anonymity,
 		arg.ItemFetch,
-	)
-	return err
-}
-
-const listProxyCandidateForTest = `-- name: ListProxyCandidateForTest :many
-select ip, port, protocol
-from proxy_candidate
-where tested_at is null
-order by ip, port, protocol limit $1
-offset $2
-`
-
-type ListProxyCandidateForTestParams struct {
-	Limit  int32
-	Offset int32
-}
-
-type ListProxyCandidateForTestRow struct {
-	Ip       string
-	Port     int32
-	Protocol string
-}
-
-func (q *Queries) ListProxyCandidateForTest(ctx context.Context, arg ListProxyCandidateForTestParams) ([]ListProxyCandidateForTestRow, error) {
-	rows, err := q.db.Query(ctx, listProxyCandidateForTest, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListProxyCandidateForTestRow
-	for rows.Next() {
-		var i ListProxyCandidateForTestRow
-		if err := rows.Scan(&i.Ip, &i.Port, &i.Protocol); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const notifyProxyCandidate = `-- name: NotifyProxyCandidate :exec
-INSERT INTO proxy_candidate (ip, port, protocol, processed_at, allow_retry_at)
-VALUES ($1, $2, $3, $4, $5) ON CONFLICT (ip, port, protocol) DO
-UPDATE
-    SET processed_at = EXCLUDED.processed_at,
-    allow_retry_at = EXCLUDED.allow_retry_at
-WHERE $4 > proxy_candidate.allow_retry_at
-`
-
-type NotifyProxyCandidateParams struct {
-	Ip           string
-	Port         int32
-	Protocol     string
-	ProcessedAt  pgtype.Timestamp
-	AllowRetryAt pgtype.Timestamp
-}
-
-func (q *Queries) NotifyProxyCandidate(ctx context.Context, arg NotifyProxyCandidateParams) error {
-	_, err := q.db.Exec(ctx, notifyProxyCandidate,
-		arg.Ip,
-		arg.Port,
-		arg.Protocol,
-		arg.ProcessedAt,
-		arg.AllowRetryAt,
-	)
-	return err
-}
-
-const notifyProxyTested = `-- name: NotifyProxyTested :exec
-INSERT INTO proxy_candidate (ip, port, protocol, processed_at, tested_at, allow_retry_at, test_error)
-VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (ip, port, protocol) DO
-UPDATE
-    SET processed_at = EXCLUDED.processed_at,
-    tested_at = excluded.tested_at,
-    allow_retry_at = EXCLUDED.allow_retry_at,
-    test_error = excluded.test_error
-`
-
-type NotifyProxyTestedParams struct {
-	Ip           string
-	Port         int32
-	Protocol     string
-	ProcessedAt  pgtype.Timestamp
-	TestedAt     pgtype.Timestamp
-	AllowRetryAt pgtype.Timestamp
-	TestError    pgtype.Text
-}
-
-func (q *Queries) NotifyProxyTested(ctx context.Context, arg NotifyProxyTestedParams) error {
-	_, err := q.db.Exec(ctx, notifyProxyTested,
-		arg.Ip,
-		arg.Port,
-		arg.Protocol,
-		arg.ProcessedAt,
-		arg.TestedAt,
-		arg.AllowRetryAt,
-		arg.TestError,
 	)
 	return err
 }

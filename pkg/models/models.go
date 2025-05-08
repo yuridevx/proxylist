@@ -8,21 +8,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type ProxyCandidate struct {
-	Ip           string
-	Port         int32
-	Protocol     string
-	ProcessedAt  pgtype.Timestamp
-	TestedAt     pgtype.Timestamp
-	AllowRetryAt pgtype.Timestamp
-	TestError    pgtype.Text
-}
-
 type ProxyInfo struct {
 	Ip                  string
 	Port                int32
 	Protocol            string
-	Delay               pgtype.Interval
+	Provider            pgtype.Text
+	DelayMs             pgtype.Int4
 	TestedAt            pgtype.Timestamp
 	Websocket           pgtype.Bool
 	Anonymity           pgtype.Bool

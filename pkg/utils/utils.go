@@ -9,8 +9,8 @@ func Discard[T any](ch chan T) {
 	}
 }
 
-func Batch(what []string, size int) [][]string {
-	var batches [][]string
+func Batch[T any](what []T, size int) [][]T {
+	var batches [][]T
 	for i := 0; i < len(what); i += size {
 		end := i + size
 		if end > len(what) {

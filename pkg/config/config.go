@@ -8,10 +8,15 @@ import (
 )
 
 type Config struct {
-	DSN           string `yaml:"dsn"`
-	ZapProduction bool   `yaml:"zap_production"`
-	ZapLogLevel   string `yaml:"zap_log_level"`
-	ParallelTests int    `yaml:"parallel_tests"`
+	DSN                string   `yaml:"dsn"`
+	ZapProduction      bool     `yaml:"zap_production"`
+	ZapLogLevel        string   `yaml:"zap_log_level"`
+	ParallelTests      int      `yaml:"parallel_tests"`
+	FetchItemUrl       string   `yaml:"fetch_item_url"`
+	ProxyTimeoutS      int      `yaml:"proxy_timeout_s"`
+	HostPortSourceList []string `yaml:"host_port_source_list"`
+	UrlSourceList      []string `yaml:"url_source_list"`
+	UseDBProxy         bool     `yaml:"use_db_proxy"`
 }
 
 func LoadConfigFromFile(path string) (*Config, error) {
@@ -59,6 +64,7 @@ func NewConfig() *Config {
 
 	finalConfig := &Config{
 		ParallelTests: 15,
+		ProxyTimeoutS: 30,
 	}
 
 	for _, path := range paths {

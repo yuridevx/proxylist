@@ -1,10 +1,22 @@
 package domain
 
-import "net/url"
+import (
+	"context"
+	"go.uber.org/zap"
+	"strconv"
+)
 
-type WebCredentials interface {
-	ProxyRandomUrl() *url.URL
-	UserAgent() string
+type ProvidedProxy struct {
+	IP       string
+	Port     int
+	Provider string
+}
 
-	RotateSessionId(prevSessionId string) string
+func (p ProvidedProxy) String() string {
+	return p.IP + ":" + strconv.Itoa(p.Port) + " (" + p.Provider + ")"
+}
+
+type ProxyProvider interface {
+	Init(log *zap.Logger, sink chan<- ProvidedProxy)
+	Reconcile(ctx context.Context) error
 }

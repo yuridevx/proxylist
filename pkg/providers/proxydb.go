@@ -5,31 +5,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/yuridevx/poe2scrap/pkg/models"
+	"github.com/yuridevx/proxylist/domain"
+	"github.com/yuridevx/proxylist/pkg/utils"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/yuridevx/poe2scrap/pkg/utils"
 	"go.uber.org/zap"
 )
 
 type ProxyDB struct {
-	db  *pgxpool.Pool
-	log *zap.Logger
+	log  *zap.Logger
+	sink chan<- domain.ProvidedProxy
 }
 
-func NewProxyDB(
-	log *zap.Logger,
-	pool *pgxpool.Pool,
-) *ProxyDB {
-	return &ProxyDB{
-		db:  pool,
-		log: log,
-	}
+func NewProxyDB() *ProxyDB {
+	return &ProxyDB{}
+}
+
+func (p *ProxyDB) Init(log *zap.Logger, sink chan<- domain.ProvidedProxy) {
+	p.log = log
+	p.sink = sink
 }
 
 type Proxy struct {
@@ -118,32 +115,15 @@ func (p *ProxyDB) handleFn(ctx context.Context, proxy Proxy) error {
 		return nil
 	}
 
-	switch proxy.Type {
-	case "http", "https":
-	case "socks4", "socks5":
-	default:
-		p.log.Warn("Unsupported scheme", zap.String("host", "proxydb"), zap.String("scheme", proxy.Type))
-		return nil
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case p.sink <- domain.ProvidedProxy{
+		IP:       cleanedIP,
+		Port:     port,
+		Provider: "proxydb",
+	}:
 	}
 
-	q := models.New(p.db)
-
-	err = q.NotifyProxyCandidate(ctx, models.NotifyProxyCandidateParams{
-		Ip:       cleanedIP,
-		Port:     int32(port),
-		Protocol: proxy.Type,
-		ProcessedAt: pgtype.Timestamp{
-			Time:  time.Now(),
-			Valid: true,
-		},
-		AllowRetryAt: pgtype.Timestamp{
-			Time:  time.Now().Add(time.Hour * 24),
-			Valid: true,
-		},
-	})
-	if err != nil {
-		p.log.Error("Insert failed", zap.String("host", "proxydb"), zap.String("proxy", cleanedIP+":"+strconv.Itoa(proxy.Port)), zap.Error(err))
-		return err
-	}
 	return nil
 }
