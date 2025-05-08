@@ -1,0 +1,44 @@
+POST https://www.pathofexile.com/api/trade2/search/poe2/Standard
+cookie: POESESSID=d59c2062ef5adcf144c2ac9f330e62c1
+Content-Type: application/json
+
+{
+  "query": {
+    "status": {
+      "option": "online"
+    },
+    "stats": [
+      {
+        "type": "and",
+        "filters": []
+      }
+    ],
+    "filters": {
+      "type_filters": {
+        "filters": {
+          "category": {
+            "option": "weapon.warstaff"
+          },
+          "rarity": {
+            "option": "rare"
+          }
+        },
+        "disabled": false
+      },
+      "trade_filters": {
+        "filters": {
+          "price": {
+            "option": "divine",
+            "min": 4
+          }
+        }
+      }
+    }
+  },
+  "sort": {
+    "price": "asc"
+  }
+}
+
+###
+
