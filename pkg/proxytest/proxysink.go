@@ -89,6 +89,10 @@ func (s *ProxySink) processOne(
 		_ = s.de.MarkProcessed(proxy)
 	}()
 
+	defer func() {
+		s.log.Info("finished proxy", zap.String("proxy", proxy.String()))
+	}()
+
 	res, err := checker.Check(ctx, proxy)
 	if err != nil {
 		//s.log.Warn("check failed",

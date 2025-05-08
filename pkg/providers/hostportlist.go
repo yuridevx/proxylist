@@ -36,6 +36,10 @@ func (ps *HostPortList) Reconcile(ctx context.Context) error {
 		return err
 	}
 
+	defer func() {
+		ps.log.Info("Reconciliation complete", zap.String("host", parsedURL.Host))
+	}()
+
 	ps.log.Debug("Starting reconciliation", zap.String("host", parsedURL.Host))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", ps.source, nil)
@@ -76,10 +80,9 @@ func (ps *HostPortList) Reconcile(ctx context.Context) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		ps.log.Warn("Scan error", zap.Error(err))
+		ps.log.Error("Scan error", zap.Error(err))
 		return err
 	}
 
-	ps.log.Debug("Reconciliation complete", zap.String("host", parsedURL.Host))
 	return nil
 }

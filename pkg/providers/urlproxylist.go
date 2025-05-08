@@ -37,6 +37,10 @@ func (ps *UrlList) Reconcile(ctx context.Context) error {
 	}
 	host := parsedUrl.Host
 
+	defer func() {
+		ps.log.Info("Reconciliation complete", zap.String("host", host))
+	}()
+
 	req, err := http.NewRequest("GET", ps.source, nil)
 	if err != nil {
 		ps.log.Error("Request creation failed", zap.String("host", host), zap.Error(err))
@@ -81,10 +85,9 @@ func (ps *UrlList) Reconcile(ctx context.Context) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		ps.log.Warn("Scan error", zap.String("host", host), zap.Error(err))
+		ps.log.Error("Scan error", zap.String("host", host), zap.Error(err))
 		return err
 	}
 
-	ps.log.Debug("Reconciliation complete", zap.String("host", host))
 	return nil
 }
