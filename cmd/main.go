@@ -5,6 +5,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/yuridevx/proxylist/domain"
 	"github.com/yuridevx/proxylist/pkg/config"
+	"github.com/yuridevx/proxylist/pkg/dedup"
 	"github.com/yuridevx/proxylist/pkg/providers"
 	"github.com/yuridevx/proxylist/pkg/proxytest"
 	"github.com/yuridevx/proxylist/pkg/reconciler"
@@ -55,6 +56,11 @@ func main() {
 		panic(err)
 	}
 
+	de, err := dedup.NewDefault()
+	if err != nil {
+		panic(err)
+	}
+
 	var sink = make(chan domain.ProvidedProxy)
 	var proxyProviders []domain.ProxyProvider
 
@@ -74,6 +80,7 @@ func main() {
 		sink,
 		logger,
 		db,
+		de,
 		conf.FetchItemUrl,
 		conf.ParallelTests,
 		conf.ProxyTimeoutS,

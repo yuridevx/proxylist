@@ -2,6 +2,7 @@ package proxytest
 
 import (
 	"context"
+	"github.com/yuridevx/proxylist/pkg/dedup"
 	"sync"
 	"time"
 
@@ -22,14 +23,16 @@ type ProxySink struct {
 	workers  int
 	wg       sync.WaitGroup
 	timeoutS int
+	de       *dedup.Deduplicator
 }
 
 // NewProxySink wires up a sink with 'n' concurrent workers.
-func NewProxySink(in <-chan domain.ProvidedProxy, log *zap.Logger, db *pgxpool.Pool, fetchUrl string, n int, timeoutS int) *ProxySink {
+func NewProxySink(in <-chan domain.ProvidedProxy, log *zap.Logger, db *pgxpool.Pool, de *dedup.Deduplicator, fetchUrl string, n int, timeoutS int) *ProxySink {
 	return &ProxySink{
 		in:       in,
 		log:      log,
 		db:       db,
+		de:       de,
 		fetchUrl: fetchUrl,
 		timeoutS: timeoutS,
 		workers:  n,
@@ -78,6 +81,14 @@ func (s *ProxySink) processOne(
 	workerID int,
 	proxy domain.ProvidedProxy,
 ) {
+	if !s.de.ShouldProcess(proxy, time.Hour*8) {
+		return
+	}
+
+	defer func() {
+		_ = s.de.MarkProcessed(proxy)
+	}()
+
 	res, err := checker.Check(ctx, proxy)
 	if err != nil {
 		//s.log.Warn("check failed",

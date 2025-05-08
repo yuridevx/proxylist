@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"go.uber.org/zap"
 	"strconv"
 )
@@ -10,6 +11,11 @@ type ProvidedProxy struct {
 	IP       string
 	Port     int
 	Provider string
+}
+
+// Key serializes a proxy to a unique string
+func (p ProvidedProxy) Key() []byte {
+	return []byte(fmt.Sprintf("%s:%d", p.IP, p.Port))
 }
 
 func (p ProvidedProxy) String() string {
